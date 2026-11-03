@@ -1,0 +1,12 @@
+{"tag": "single_object", "include": [{"class": "bench", "count": 1}], "prompt": "a photo of a bench"}
+{"tag": "single_object", "include": [{"class": "cow", "count": 1}], "prompt": "a photo of a cow"}
+{"tag": "two_object", "include": [{"class": "bench", "count": 1}, {"class": "sports ball", "count": 1}], "prompt": "a photo of a bench and a sports ball"}
+{"tag": "two_object", "include": [{"class": "toothbrush", "count": 1}, {"class": "snowboard", "count": 1}], "prompt": "a photo of a toothbrush and a snowboard"}
+{"tag": "counting", "include": [{"class": "clock", "count": 2}], "exclude": [{"class": "clock", "count": 3}], "prompt": "a photo of two clocks"}
+{"tag": "counting", "include": [{"class": "backpack", "count": 2}], "exclude": [{"class": "backpack", "count": 3}], "prompt": "a photo of two backpacks"}
+{"tag": "colors", "include": [{"class": "fire hydrant", "count": 1, "color": "blue"}], "prompt": "a photo of a blue fire hydrant"}
+{"tag": "colors", "include": [{"class": "car", "count": 1, "color": "pink"}], "prompt": "a photo of a pink car"}
+{"tag": "position", "include": [{"class": "teddy bear", "count": 1}, {"class": "dog", "count": 1, "position": ["right of", 0]}], "prompt": "a photo of a dog right of a teddy bear"}
+{"tag": "position", "include": [{"class": "kite", "count": 1}, {"class": "wine glass", "count": 1, "position": ["above", 0]}], "prompt": "a photo of a wine glass above a kite"}
+{"tag": "color_attr", "include": [{"class": "wine glass", "count": 1, "color": "purple"}, {"class": "apple", "count": 1, "color": "black"}], "prompt": "a photo of a purple wine glass and a black apple"}
+{"tag": "color_attr", "include": [{"class": "bus", "count": 1, "color": "green"}, {"class": "microwave", "count": 1, "color": "purple"}], "prompt": "a photo of a green bus and a purple microwave"}

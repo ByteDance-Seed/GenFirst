@@ -1,0 +1,239 @@
+GenFirst -- third-party notices
+===============================
+
+The code written for this project is released under the MIT license in
+LICENSE. This file records the third-party code vendored into the repository,
+because not all of it is under MIT. Read the "Components whose upstream
+licensing should be verified" section below before you build on this
+repository.
+
+
+Removed: NVIDIA EDM2 data preprocessing
+---------------------------------------
+
+Earlier revisions of this repository vendored ten files derived from
+https://github.com/NVlabs/edm2, which is released under Creative Commons
+Attribution-NonCommercial-ShareAlike 4.0:
+
+    preprocessing.py
+    Prior_only/preprocessing/dataset_tools.py
+    Prior_only/preprocessing/encoders.py
+    Prior_only/preprocessing/dnnlib/{__init__,util}.py
+    Prior_only/preprocessing/torch_utils/{__init__,distributed,misc,
+                                          persistence,training_stats}.py
+
+CC BY-NC-SA 4.0 is not compatible with MIT in either direction: NonCommercial
+forbids commercial use where MIT grants it explicitly, and ShareAlike requires
+derivatives to stay under CC BY-NC-SA 4.0. Relicensing was not an option, so
+the files have been deleted and the functionality reimplemented from scratch:
+
+    tools/image_prep.py        shared image discovery, labelling and cropping
+    tools/build_image_h5.py    replaces preprocessing.py
+    tools/build_image_dir.py   replaces dataset_tools.py convert
+    tools/encode_latents.py    replaces dataset_tools.py encode and encoders.py
+
+These are original work under the MIT license in LICENSE. They were written
+against the output contracts this repository's own loaders impose --
+CustomINH5Dataset and CustomH5Dataset in dataset.py, CustomDataset in
+Prior_only/dataset.py, and sample_posterior in Prior_only/train_prior_only.py
+-- and their latent-encoding loop follows this project's own VAE code in
+models/autoencoder.py. Copyright does not reach the data layouts or the command
+line those contracts describe, only the expression of the deleted files, and
+none of that expression is reused here.
+
+Two capabilities of the EDM2 originals were dropped rather than reimplemented,
+because nothing in this repository used them: the pretrained-encoder zoo in
+encoders.py (every recipe here encodes with this project's own VAE, so
+tools/encode_latents.py accepts only --vae-type=e2e), and the dnnlib and
+torch_utils support tree, which no code outside the deleted directory imported.
+
+
+Components whose upstream licensing should be verified
+------------------------------------------------------
+
+These files carry a Meta copyright header whose text reads "licensed under the
+license found in the LICENSE file in the root directory of this source tree".
+That sentence was written for the tree the file originally shipped in; once
+vendored here, the relative reference resolves to this repository's MIT
+LICENSE, which is not the license the code was released under. Each file has
+been annotated in place to say so.
+
+They reached this repository through REPA and REPA-E, both of which are MIT
+licensed and both of which already vendored these files and shipped the tree
+as MIT. The licensing question is therefore inherited rather than introduced
+here, but it is unresolved, and the original projects are non-commercial:
+
+    generate.py                     via REPA, chain: DiT -> SiT -> REPA
+    Prior_only/generate.py          via REPA, chain: DiT -> SiT -> REPA
+    models/sit.py                   via REPA, chain: DiT -> SiT -> REPA
+    Prior_only/models/sit.py        via REPA, chain: DiT -> SiT -> REPA
+    models/mae_vit.py               facebookresearch/mae
+    Prior_only/models/mae_vit.py    facebookresearch/mae
+    models/mocov3_vit.py            facebookresearch/moco-v3
+    Prior_only/models/mocov3_vit.py facebookresearch/moco-v3
+    models/jepa.py                  facebookresearch/ijepa
+    Prior_only/models/jepa.py       facebookresearch/ijepa
+
+MAE, MoCo v3, I-JEPA and DiT are each distributed by Meta under Creative
+Commons Attribution-NonCommercial 4.0
+(https://creativecommons.org/licenses/by-nc/4.0/legalcode).
+
+The mae_vit, mocov3_vit and jepa files supply alternative REPA alignment
+encoders only. Every recipe in this repository defaults to the timm DINOv2
+encoder, so they can be deleted without affecting the documented results. The
+generate.py and sit.py files are the sampling entry points and the backbone,
+and cannot.
+
+The two sit.py files had lost their copyright line somewhere upstream, leaving
+a header that pointed at a license file without saying whose code it was. The
+line has been restored to match the rest of the DiT-derived files here.
+
+
+Permissively licensed components
+--------------------------------
+
+REPA -- MIT, Copyright (c) 2024 Sihyun Yu
+Upstream: https://github.com/sihyun-yu/REPA
+The Prior_only/ tree is a fork of REPA. Its license is kept verbatim at
+Prior_only/LICENSE.
+
+REPA-E -- MIT, Copyright (c) 2025 Xingjian Leng and Jaskirat Singh
+Upstream: https://github.com/End2End-Diffusion/REPA-E
+The root tree derives from REPA-E. Its copyright notice is retained in
+LICENSE.
+
+Cola text VAE -- Apache License 2.0
+Copyright (c) 2025 ByteDance Ltd. and/or its affiliates
+License: https://www.apache.org/licenses/LICENSE-2.0
+
+    models/cola_text_vae/__init__.py
+    models/cola_text_vae/attention_utils.py
+    models/cola_text_vae/configuration_cola_vae.py
+    models/cola_text_vae/modeling_cola_vae.py
+
+CompVis latent-diffusion -- MIT
+Copyright (c) 2022 Machine Vision and Learning Group, LMU Munich
+Upstream: https://github.com/CompVis/latent-diffusion
+
+    models/autoencoder.py
+    Prior_only/e2e_vae.py
+
+CompVis taming-transformers -- MIT
+Copyright (c) 2020 Patrick Esser, Robin Rombach and Bjoern Ommer
+Upstream: https://github.com/CompVis/taming-transformers
+
+    loss/discriminator.py
+
+Reconstruction losses -- Apache License 2.0
+Copyright (2024) Bytedance Ltd. and/or its affiliates
+
+    loss/losses.py
+    loss/lpips.py
+    loss/perceptual_loss.py
+
+These arrived with their own Apache-2.0 headers, which have been left as they
+were. They restate parts of taming-transformers and of richzhang's
+PerceptualSimilarity; the individual docstrings give the upstream files.
+
+Stability AI SD3 reference implementation -- MIT
+Copyright (c) 2024 Stability AI
+Upstream: https://github.com/Stability-AI/sd3-ref
+
+    Prior_only/models/mmdit.py
+
+This file is upstream's mmdit.py and other_impls.py concatenated. Upstream
+notes that parts of other_impls come from HuggingFace Transformers and are
+Apache-2.0. Only the reference *code* is MIT; the SD3 model weights are covered
+separately by the Stability AI Community License and are not distributed here.
+
+OpenAI CLIP -- MIT
+Copyright (c) 2021 OpenAI
+Upstream: https://github.com/openai/CLIP, reached here through REPA
+
+    models/clip_vit.py
+    Prior_only/models/clip_vit.py
+
+Evaluation code follows torch-fidelity, MAR and latent-diffusion; see the
+Acknowledgements section of README.md for the references.
+
+
+Notes on source-fingerprint scan results
+----------------------------------------
+
+Every source file in this repository now carries a header naming its copyright
+holder and license. Files without one were the root cause of most of the
+findings below: with nothing local to read, a scanner falls back to whichever
+project its fingerprint database matched, and reports that project's license
+instead of the real one. Because the files vendored here have widely reused
+ancestors, a scan of this repository reliably produces the matches below. They
+are recorded here so the provenance does not have to be reconstructed on every
+rescan.
+
+This section covers the license findings. The vulnerability findings from the
+same scans are assessed in docs/SECURITY_NOTES.md.
+
+lumalabs/imm at e124a9d, reported as CC-BY-NC-SA-4.0
+This match was correct about the license and wrong about the project. IMM
+vendors utility code from NVlabs/EDM and says so in its README, and the files
+it matched here were the EDM2-derived preprocessing files described in the
+"Removed" section above. Those files have since been deleted and their
+functionality rewritten, so a scan of the current tree should no longer produce
+this finding. If it reappears, it is matching history rather than the working
+tree; check which paths it names before dismissing it.
+
+InvokeAI release-1.13, reported as GPL-3.0-or-later conflicting with MIT
+Not a dependency, and not GPL. The scan's own metadata shows both.
+
+The component is recorded with an empty build-dependency path and a match type
+of "code snippet", so the tool agrees it reached this project by fingerprint
+rather than through any dependency. The download it names is
+github.com/lstein/stable-diffusion at release-1.13, a September 2022 snapshot
+of the repository that was renamed to InvokeAI later that month.
+
+The copyright holders the scan lists for that component are Lincoln D. Stein,
+Machine Vision and Learning Group at LMU Munich, and Robin Rombach and Patrick
+Esser. Those three names appear together in exactly one place: the MIT LICENSE
+of lstein/stable-diffusion, which states that the code derives from CompVis and
+carries the CompVis copyrights. The last two are the latent-diffusion authors,
+and latent-diffusion is where models/autoencoder.py in this repository comes
+from, as its header records. The chain is MIT to MIT.
+
+The GPL-3.0-or-later verdict traces to the fourth copyright in the same list,
+"Copyright (C) 2007 Free Software Foundation", which is the opening line of the
+GPL-3 license text. That 2022 snapshot bundled a GPL-3 component and therefore
+carried a copy of the GPL-3 text. The scan unions every license found anywhere
+in the snapshot and applies the result to the matched snippet, but the snippet
+is CompVis autoencoder code and no part of it is GPL. No copyleft obligation
+follows.
+
+xAR at 3b0bf91, reported against Prior_only/loss.py, no license
+Not a dependency. xAR is another SiT descendant that also vendors REPA's
+stochastic-interpolant loss, so a source-fingerprint scan of an earlier
+revision of Prior_only/loss.py matched xAR's copy and then applied xAR's
+"no license" status to this repository. The algorithm is still REPA's
+(MIT, Prior_only/LICENSE); the file itself has been rewritten so it is no
+longer a snippet of either xAR or the original REPA source, and carries an
+SPDX MIT header. A later scan that still names xAR is matching ancestry,
+not a copy.
+
+
+Dependencies
+------------
+
+Dependencies are installed from PyPI rather than vendored, so their licenses
+are not reproduced here. One is worth a note because scanners flag it: tqdm is
+dual-licensed MPL-2.0 AND MIT. MPL-2.0 is file-level copyleft whose obligations
+attach to distributing the MPL-covered files themselves, and it expressly
+permits combining them into a larger work under other terms. Since tqdm is
+installed as an ordinary dependency and no part of it is redistributed here, it
+places no requirement on this repository.
+
+
+Model weights and datasets
+--------------------------
+
+Nothing in this repository grants rights to the checkpoints or datasets it
+downloads or reads. ImageNet, COCO, DINOv2, CLIP, SigLIP, the Flux VAE,
+Qwen3-VL, the Cola-DLM weights and the GenEval and DPG-Bench assets are each
+distributed under their own terms, several of which are research-only. Check
+the terms of every artifact you fetch.

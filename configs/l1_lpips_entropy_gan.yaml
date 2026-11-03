@@ -1,0 +1,27 @@
+model:
+    vq_model:
+        quantize_mode: vae
+
+losses:
+    discriminator_start: 0
+    discriminator_factor: 1.0
+    discriminator_weight: 0.1
+    quantizer_weight: 1.0
+    perceptual_loss: "lpips"
+    perceptual_weight: 1.0
+    reconstruction_loss: "l1"
+    reconstruction_weight: 1.0
+    lecam_regularization_weight: 0.0
+    # `latent_reg: entropy` replaces the standard KL-to-N(0, I) with posterior
+    # entropy *maximization* (total_loss += -kl_weight * entropy). This is the
+    # anti-collapse regularizer for end-to-end training, where the diffusion gradient is
+    # allowed to flow into the VAE. `kl_weight` is reused as the entropy weight;
+    # tune it via --latent-reg-weight (entropy here is ~O(1), so the weight is
+    # much larger than the KL weight of 1e-6 used in the baseline).
+    latent_reg: entropy
+    kl_weight: 1.0e-2
+    logvar_init: 0.0
+    # Small auxiliary KL added on top of the entropy term. Entropy does not
+    # constrain the posterior `mean`; this KL's mean^2 term keeps the encoder
+    # mean bounded (prevents the NaN from a runaway mean). 0 disables it.
+    entropy_aux_kl_weight: 1.0e-6

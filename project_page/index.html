@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GenFirst: Generation Before Reconstruction for Stable End-to-End Latent Generative Modeling</title>
+<meta name="description" content="GenFirst enables stable direct end-to-end training of VAEs and latent generative models by preserving posterior entropy and letting generation shape the latent space before reconstruction.">
+
+<meta property="og:title" content="GenFirst: Generation Before Reconstruction">
+<meta property="og:description" content="Stable end-to-end latent generative modeling. FID 0.97 on ImageNet-256, GenEval 0.90 on text-to-image.">
+<meta property="og:image" content="https://tom-zgt.github.io/GenFirst/static/images/fig1.png">
+<meta property="og:url" content="https://tom-zgt.github.io/GenFirst/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>GenFirst</h1>
+    <p class="subtitle">Generation Before Reconstruction for<br>Stable End-to-End Latent Generative Modeling</p>
+
+    <p class="authors">
+      <a href="#">Guangting Zheng</a><sup>1,2</sup>,
+      <a href="#">Yiyuan Zhang</a><sup>2</sup>,
+      <a href="#">Tao Yang</a><sup>2</sup>,
+      <a href="#">Yunpeng Chen</a><sup>2</sup>,
+      <a href="#">Rui Zhu</a><sup>2,&dagger;</sup>,
+      <a href="#">Jiajun Deng</a><sup>1</sup>,
+      <a href="#">Yanyong Zhang</a><sup>1,&Dagger;</sup>
+    </p>
+    <p class="affil">
+      <sup>1</sup>University of Science and Technology of China &nbsp;&nbsp;
+      <sup>2</sup>ByteDance Seed
+    </p>
+    <p class="affil note">
+      <sup>&dagger;</sup>Project lead &nbsp;&nbsp; <sup>&Dagger;</sup>Corresponding author
+    </p>
+
+    <nav class="links">
+      <a href="https://arxiv.org/abs/2608.29335">Paper</a>
+      <a href="https://github.com/ByteDance-Seed/GenFirst">Code</a>
+      <a href="https://huggingface.co/ByteDance-Seed/GenFirst">Weights</a>
+      <a href="#bibtex">BibTeX</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <figure class="teaser">
+    <img src="assets/teaser.jpg" alt="Comparison of latent generative modeling paradigms">
+    <figcaption>
+      <b>Four paradigms for latent generative modeling.</b>
+      (a) Conventional two-stage training fits the generative model to a fixed,
+      reconstruction-oriented latent space that may be poorly suited to
+      generation. (b) Naive end-to-end training lets the generative loss update
+      the encoder, and the latent collapses. (c) REPA-E avoids collapse by
+      stopping the generative gradient and reshaping the latent through an
+      external representation-alignment loss, so the generative objective never
+      shapes the latent directly. (d) Ours trains end-to-end directly: the prior
+      loss shapes a generation-friendly latent space while the entropy term
+      prevents collapse.
+    </figcaption>
+  </figure>
+
+  <section>
+    <h2>Abstract</h2>
+    <p>
+      Latent generative models typically follow a two-stage pipeline, training a
+      variational autoencoder for reconstruction and then a generative model on
+      the frozen latent space. Since reconstruction-optimized latents are not
+      necessarily generation-friendly, jointly training both models is an
+      appealing alternative. However, direct end-to-end training remains
+      challenging, as it is prone to <b>latent collapse</b> and faces a
+      <b>generation&ndash;reconstruction conflict</b>. In this work, we revisit
+      this problem by analyzing how
+      different objectives shape the latent space and identify two key insights.
+      First, the entropy term in the Kullback&ndash;Leibler divergence objective
+      is essential for preventing collapse: reconstruction and prior fitting both
+      tend to shrink the posterior, while entropy preserves non-degenerate latent
+      uncertainty. Second, reconstruction and generation exhibit asymmetric
+      learning dynamics: reconstruction is fast and strongly supervised, whereas
+      generation is slower and harder to optimize. Motivated by these insights, we
+      achieve the first direct end-to-end training without latent collapse and
+      further propose <b>GenFirst</b>, a simple generation-before-reconstruction
+      strategy. The generative objective first shapes the latent space under weak
+      reconstruction pressure, after which reconstruction is progressively
+      strengthened to recover visual details. We validate this strategy using both
+      continuous autoregressive priors with exact likelihoods and SiT priors with
+      implicit likelihoods. With our simple end-to-end training strategy, SiT
+      achieves an FID of <b>0.97</b> with guidance and <b>1.45</b> without
+      guidance on ImageNet-256, while MMDiT reaches a GenEval score of
+      <b>0.90</b> on text-to-image generation.
+    </p>
+  </section>
+
+  <section class="highlights">
+    <h2>At a glance</h2>
+    <div class="cards">
+      <div class="card">
+        <div class="num">0.97</div>
+        <div class="lbl">gFID, ImageNet 256<br><span>with guidance</span></div>
+      </div>
+      <div class="card">
+        <div class="num">1.45</div>
+        <div class="lbl">gFID, ImageNet 256<br><span>without guidance</span></div>
+      </div>
+      <div class="card">
+        <div class="num">1.23</div>
+        <div class="lbl">gFID, ImageNet 512<br><span>with guidance</span></div>
+      </div>
+      <div class="card">
+        <div class="num">0.90</div>
+        <div class="lbl">GenEval<br><span>text-to-image</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Why naive end-to-end training collapses</h2>
+    <p>
+      For a standard Gaussian prior, the KL regularizer decomposes into a
+      prior-fitting term and a negative posterior-entropy term:
+    </p>
+    <p class="eq">
+      D<sub>KL</sub>(q<sub>&phi;</sub>(z|x) &#8214; p<sub>0</sub>(z))
+      = <span class="brace">E<sub>q</sub>[&minus;log p<sub>0</sub>(z)]</span><sub class="under">prior fitting</sub>
+      &nbsp;&minus;&nbsp;
+      <span class="brace">H(q<sub>&phi;</sub>(z|x))</span><sub class="under">entropy</sub>
+    </p>
+    <p>
+      The prior term pulls latent samples toward high-probability regions; the
+      entropy term is what keeps the posterior from degenerating into point
+      masses. Following LDM, practitioners weight the whole KL term by something
+      like 10<sup>&minus;6</sup> and treat it as an engineering detail. That is
+      harmless while the prior is fixed. The moment a generative loss is added, it
+      acts as a <em>learned</em> prior-fitting force of weight
+      &lambda;<sub>prior</sub> &#8811; &lambda;<sub>KL</sub>, and the balance
+      between the two halves of the KL is destroyed. Posterior variance is driven
+      to zero, the means converge to nearly one code, and the latent space
+      collapses.
+    </p>
+    <p>
+      This reframes collapse from an empirical failure mode into a diagnosable
+      imbalance in the objective. We therefore separate the two terms and weight
+      entropy explicitly:
+    </p>
+    <p class="eq big">
+      L<sub>E2E</sub> = L<sub>img</sub>
+      + &lambda;<sub>prior</sub> L<sub>prior</sub>
+      &minus; &lambda;<sub>ent</sub> H(q<sub>&phi;</sub>(z|x))
+    </p>
+    <figure>
+      <img src="assets/latent_stats.jpg" alt="Effect of each objective on the latent posterior">
+      <figcaption>
+        <b>Each objective pushes the posterior in a different direction</b>,
+        visualized as Std(&mu;), how widely posterior means spread across images,
+        against E[&sigma;<sup>2</sup>], the average posterior uncertainty. When
+        reconstruction dominates, Std(&mu;) rises but E[&sigma;<sup>2</sup>]
+        falls: easy to reconstruct, full of gaps, hard to sample. When prior
+        fitting dominates without entropy, both fall and the posterior collapses
+        toward a constant code. Entropy raises E[&sigma;<sup>2</sup>], increasing
+        posterior overlap and closing those gaps.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Balancing the losses is not enough</h2>
+    <p>
+      With collapse resolved, a genuine generation&ndash;reconstruction conflict
+      remains. Raising &lambda;<sub>prior</sub> from 0 to 1 improves gFID from
+      120.60 to 8.06 while rFID degrades from 0.53 to 4.20 &mdash; the two
+      objectives simply prefer different operating points. Relaxing the
+      bottleneck does not fix it either: a larger latent dimension, a bigger VAE,
+      and a bigger prior all shift the trade-off without removing it.
+    </p>
+    <figure>
+      <img src="assets/scaling.jpg" alt="Scaling latent dimension, VAE capacity and prior capacity">
+      <figcaption>
+        Larger latent dimension, VAE capacity and prior capacity all move along
+        the trade-off rather than escaping it.
+      </figcaption>
+    </figure>
+    <p>
+      Generic weighting schedules fare no better. A constant weight gives
+      reasonable generation and poor reconstruction (gFID 3.04, rFID 3.27); cosine
+      decay inverts that (rFID 0.66, gFID 5.45); a PI controller diverges,
+      because the early reconstruction error sits far above target, so the mixing
+      coefficient saturates at its bound and then oscillates.
+    </p>
+    <table class="results">
+      <caption>Prior-loss balancing strategies, same architecture and budget.</caption>
+      <thead>
+        <tr><th>Strategy</th><th>gFID (CFG) &darr;</th><th>IS (CFG) &uarr;</th><th>rFID &darr;</th><th>PSNR &uarr;</th><th>SSIM &uarr;</th></tr>
+      </thead>
+      <tbody>
+        <tr class="ours"><td>GenFirst</td><td>2.10</td><td>246.70</td><td>1.26</td><td>21.93</td><td>0.58</td></tr>
+        <tr><td>Constant</td><td>3.04</td><td>251.2</td><td>3.27</td><td>19.52</td><td>0.48</td></tr>
+        <tr><td>Cosine decay</td><td>5.45</td><td>136.11</td><td>0.66</td><td>23.87</td><td>0.67</td></tr>
+        <tr><td>PI adaptive</td><td colspan="5" class="nan">diverged</td></tr>
+        <tr class="dim"><td>Frozen VAE</td><td>6.97</td><td>147.04</td><td>0.53</td><td>26.18</td><td>0.72</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>GenFirst: generation before reconstruction</h2>
+    <p>
+      The conflict is not only a question of <em>how much</em> each objective is
+      weighted, but of <em>when</em> each one shapes the latent space.
+      Reconstruction is a fast, densely supervised mapping problem: given latents,
+      the decoder gets direct pixel supervision and recovers detail quickly.
+      Generation is a slow distribution-modeling problem: the prior must learn the
+      global latent distribution before it produces anything realistic.
+    </p>
+    <figure>
+      <img src="assets/dynamics.jpg" alt="Asymmetric learning dynamics between reconstruction and generation">
+      <figcaption>
+        <b>Asymmetric learning dynamics.</b> Reconstruction reaches good fidelity
+        in far fewer steps, while generation needs a much longer optimization to
+        learn a sampleable latent distribution.
+      </figcaption>
+    </figure>
+    <p>
+      Strong reconstruction pressure early therefore anchors the encoder to a
+      latent space the generative model then has to chase. GenFirst inverts the
+      order: let the generative objective shape the latent first, under weak
+      reconstruction pressure and explicit entropy preservation, then strengthen
+      reconstruction to recover detail within the latent space that was found. We
+      set &lambda;<sub>ent</sub> = &lambda;<sub>prior</sub> throughout and keep the
+      reconstruction, LPIPS and GAN weights at their standard VAE values.
+    </p>
+    <figure>
+      <img src="assets/genfirst.jpg" alt="The GenFirst generation-before-reconstruction schedule">
+      <figcaption>
+        <b>The GenFirst schedule.</b> A long first phase at high prior weight
+        forms the latent geometry; a shorter second phase at reduced prior weight
+        refines reconstruction without leaving it.
+      </figcaption>
+    </figure>
+    <p>
+      The second-phase weight is a real choice rather than a formality. Lowering
+      it improves reconstruction and, up to a point, generation as well; lowering
+      it too far biases the latent back toward reconstruction and generation
+      degrades again.
+    </p>
+    <table class="results">
+      <caption>Second-phase prior weight, autoregressive prior.</caption>
+      <thead>
+        <tr><th>&lambda;<sub>prior</sub> (phase 2)</th><th>gFID &darr;</th><th>IS &uarr;</th><th>rFID &darr;</th><th>PSNR &uarr;</th><th>SSIM &uarr;</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>0.5</td><td>5.55</td><td>144.57</td><td>2.93</td><td>21.31</td><td>0.51</td></tr>
+        <tr><td>0.35</td><td>5.39</td><td>146.39</td><td>2.43</td><td>21.93</td><td>0.54</td></tr>
+        <tr class="ours"><td>0.25</td><td>5.09</td><td>148.23</td><td>1.29</td><td>22.36</td><td>0.56</td></tr>
+        <tr><td>0.1</td><td>7.24</td><td>130.34</td><td>1.28</td><td>23.37</td><td>0.61</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Two priors, one recipe</h2>
+    <div class="two-col">
+      <div>
+        <h3>EAR &mdash; exact likelihood</h3>
+        <p>
+          A continuous autoregressive prior over flattened latent tokens with a
+          Gaussian-mixture density head, following FARMER. Because the likelihood
+          is exact, the prior loss is a genuine negative log-likelihood over VAE
+          latents, and the prior&ndash;entropy balance can be analyzed directly.
+          GenFirst here means &lambda;<sub>prior</sub> = 1 for 500 epochs, then
+          0.25 for 140.
+        </p>
+      </div>
+      <div>
+        <h3>EiT &mdash; implicit likelihood</h3>
+        <p>
+          A SiT flow-matching prior. Since SiT perturbs latents with standard
+          Gaussian noise, the latent scale must stay bounded, or the injected
+          noise becomes relatively negligible and the denoising loss can be
+          shortcut; we keep a 10<sup>&minus;6</sup> KL for scale alongside the
+          explicit entropy term. GenFirst here means
+          &lambda;<sub>prior</sub> = 0.1 for 80 epochs, then 0.01 for 40.
+        </p>
+      </div>
+    </div>
+    <p class="callout">
+      The two priors behave differently in one revealing way. For the
+      exact-likelihood autoregressive prior, training end-to-end and using the
+      resulting prior directly is best. For diffusion, it is better to
+      <b>freeze the end-to-end VAE and retrain the prior on it</b> &mdash; a
+      diffusion model provides no explicit density over VAE latents, so the
+      jointly trained prior never fits them as one. This is why the released
+      pipeline is two-stage.
+    </p>
+  </section>
+
+  <section>
+    <h2>Results</h2>
+
+    <h3>Class-conditional ImageNet 256&times;256</h3>
+    <table class="results wide">
+      <thead>
+        <tr>
+          <th rowspan="2">Method</th><th rowspan="2">Epochs</th><th rowspan="2">#Params</th>
+          <th colspan="2">w/o guidance</th><th colspan="2">w/ guidance</th>
+        </tr>
+        <tr><th>gFID &darr;</th><th>IS &uarr;</th><th>gFID &darr;</th><th>IS &uarr;</th></tr>
+      </thead>
+      <tbody>
+        <tr class="dim"><td>DiT</td><td>1400</td><td>675M</td><td>9.62</td><td>121.5</td><td>2.27</td><td>278.2</td></tr>
+        <tr class="dim"><td>SiT</td><td>1400</td><td>675M</td><td>8.61</td><td>131.7</td><td>2.06</td><td>270.3</td></tr>
+        <tr class="dim"><td>REPA</td><td>800</td><td>675M</td><td>5.78</td><td>158.3</td><td>1.29</td><td>306.3</td></tr>
+        <tr class="dim"><td>VA-VAE</td><td>800</td><td>675M</td><td>2.17</td><td>205.6</td><td>1.35</td><td>295.3</td></tr>
+        <tr class="dim"><td>RAE</td><td>800</td><td>839M</td><td>1.51</td><td>242.9</td><td>1.13</td><td>262.6</td></tr>
+        <tr class="dim"><td>REPA-E</td><td>800</td><td>675M</td><td>1.69</td><td>219.3</td><td>1.12</td><td>302.9</td></tr>
+        <tr class="ours"><td>Gen1st-EiT</td><td>80</td><td>675M</td><td>2.79</td><td>175.4</td><td>1.38</td><td>271.3</td></tr>
+        <tr class="ours"><td>Gen1st-EiT</td><td>480</td><td>675M</td><td>1.60</td><td>216.8</td><td>0.988</td><td>270.7</td></tr>
+        <tr class="ours"><td>Gen1st-EiT</td><td>800</td><td>675M</td><td><b>1.45</b></td><td>226.7</td><td><b>0.969</b></td><td>283.4</td></tr>
+        <tr class="ours alt"><td>Gen1st-EAR</td><td>500+140</td><td>312M</td><td>6.10 / 3.83<sup>*</sup></td><td>138.4 / 164.0<sup>*</sup></td><td>2.10</td><td>246.7</td></tr>
+      </tbody>
+    </table>
+    <p class="fine">
+      <sup>*</sup>with low-temperature sampling. The 80-epoch EiT row already
+      surpasses SiT at 1400 epochs and REPA at 800, roughly 17.5&times; and
+      10&times; less training. Epochs count the prior-only (frozen-VAE) stage.
+    </p>
+
+    <h3>Class-conditional ImageNet 512&times;512</h3>
+    <table class="results">
+      <thead>
+        <tr><th>Method</th><th>#Params</th><th>gFID &darr;</th><th>IS &uarr;</th><th>Prec. &uarr;</th><th>Rec. &uarr;</th></tr>
+      </thead>
+      <tbody>
+        <tr class="dim"><td>SiT</td><td>674M</td><td>2.62</td><td>252.2</td><td>0.84</td><td>0.57</td></tr>
+        <tr class="dim"><td>REPA</td><td>675M</td><td>2.08</td><td>274.6</td><td>0.83</td><td>0.58</td></tr>
+        <tr class="dim"><td>EDM2</td><td>1.5B</td><td>1.25</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr>
+        <tr class="dim"><td>RAE</td><td>839M</td><td>1.13</td><td>259.6</td><td>0.80</td><td>0.63</td></tr>
+        <tr class="ours"><td>Gen1st-EiT (80 ep)</td><td>675M</td><td>1.63</td><td>278.9</td><td>0.81</td><td>0.61</td></tr>
+        <tr class="ours"><td>Gen1st-EiT (400 ep)</td><td>675M</td><td><b>1.23</b></td><td>286.1</td><td>0.80</td><td>0.63</td></tr>
+        <tr class="ours alt"><td>Gen1st-EAR</td><td>940M</td><td>1.87</td><td>280.0</td><td>0.82</td><td>0.58</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Does end-to-end training actually learn a better latent space?</h3>
+    <p>
+      Yes, and the effect is large. Freezing the end-to-end VAE and training a
+      fresh prior on it cuts gFID from 36.33 to 5.67 for the autoregressive prior
+      and from 7.90 to 3.57 for diffusion, against the same architecture trained
+      on a conventional reconstruction-optimized latent space. Naive end-to-end
+      training, for reference, produces gFID 294.9 for AR and diverges outright
+      for diffusion.
+    </p>
+    <table class="results">
+      <caption>Against REPA and REPA-E at matched budget, no guidance.</caption>
+      <thead>
+        <tr><th>Method</th><th>gFID &darr;</th><th>IS &uarr;</th><th>Prec. &uarr;</th><th>Rec. &uarr;</th></tr>
+      </thead>
+      <tbody>
+        <tr class="dim"><td>REPA</td><td>7.90</td><td>122.60</td><td>0.70</td><td>0.65</td></tr>
+        <tr class="dim"><td>REPA-E, from scratch</td><td>4.34</td><td>154.30</td><td>0.75</td><td>0.63</td></tr>
+        <tr class="dim"><td>REPA-E, SD-VAE init</td><td>4.07</td><td>161.80</td><td>0.76</td><td>0.62</td></tr>
+        <tr class="dim"><td>REPA-E, VA-VAE init</td><td>3.46</td><td>159.80</td><td>0.77</td><td>0.63</td></tr>
+        <tr class="ours"><td>Ours, from scratch</td><td>3.78</td><td>161.42</td><td>0.78</td><td>0.61</td></tr>
+        <tr class="ours"><td>Ours, SD-VAE init</td><td>3.57</td><td>166.49</td><td>0.77</td><td>0.62</td></tr>
+        <tr class="ours"><td>Ours, VA-VAE init</td><td><b>2.79</b></td><td><b>175.40</b></td><td>0.78</td><td>0.63</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Text-to-image</h3>
+    <p>
+      The same recipe transfers. The end-to-end stage jointly trains the
+      FLUX.1-dev VAE with a generative prior; the prior-only stage freezes that
+      VAE and trains the target MMDiT on the full text-to-image corpus.
+    </p>
+    <table class="results narrow">
+      <thead><tr><th>Benchmark</th><th>Score</th></tr></thead>
+      <tbody>
+        <tr class="ours"><td>GenEval</td><td><b>0.90</b></td></tr>
+        <tr class="ours"><td>DPG-Bench</td><td><b>82.60</b></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Samples</h2>
+    <figure>
+      <img src="assets/samples_256.jpg" alt="ImageNet 256 samples">
+      <figcaption>ImageNet 256&times;256, SiT-XL/1 with guidance.</figcaption>
+    </figure>
+    <figure>
+      <img src="assets/samples_512.jpg" alt="ImageNet 512 samples">
+      <figcaption>ImageNet 512&times;512.</figcaption>
+    </figure>
+    <figure>
+      <img src="assets/samples_t2i.jpg" alt="Text-to-image samples">
+      <figcaption>Text-to-image generation with MMDiT on the end-to-end VAE.</figcaption>
+    </figure>
+  </section>
+
+  <section id="bibtex">
+    <h2>BibTeX</h2>
+    <pre><code>@article{zheng2026genfirst,
+  title   = {GenFirst: Generation Before Reconstruction for Stable End-to-End
+             Latent Generative Modeling},
+  author  = {Zheng, Guangting and Zhang, Yiyuan and Yang, Tao and Chen, Yunpeng
+             and Zhu, Rui and Deng, Jiajun and Zhang, Yanyong},
+  journal = {arXiv preprint arXiv:2608.29335},
+  year    = {2026}
+}</code></pre>
+  </section>
+
+  <section>
+    <h2>Acknowledgements</h2>
+    <p class="fine">
+      The implementation builds on
+      <a href="https://github.com/sihyun-yu/REPA">REPA</a> and
+      <a href="https://github.com/End2End-Diffusion/REPA-E">REPA-E</a>. The
+      <code>f16d32</code> configuration is initialized from
+      <a href="https://github.com/hustvl/LightningDiT">VA-VAE</a> and the
+      text-to-image VAE is
+      <a href="https://github.com/black-forest-labs/flux">FLUX.1-dev</a>'s.
+      FID and IS are computed with
+      <a href="https://github.com/LTH14/torch-fidelity">torch-fidelity</a> against
+      <a href="https://github.com/LTH14/mar">MAR</a>'s ImageNet reference
+      statistics, the reconstruction metrics follow
+      <a href="https://github.com/CompVis/latent-diffusion">latent-diffusion</a>,
+      and guidance uses
+      <a href="https://arxiv.org/abs/2406.02507">autoguidance</a>. Text-to-image is
+      scored with
+      <a href="https://github.com/djghosh13/geneval">GenEval</a> and
+      <a href="https://github.com/TencentQQGYLab/ELLA">DPG-Bench</a>.
+    </p>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Correspondence: <a href="mailto:zgt@mail.ustc.edu.cn">zgt@mail.ustc.edu.cn</a></p>
+  </div>
+</footer>
+
+<script>
+// Figures are placeholders until the paper assets land in assets/. Rather than
+// showing broken images, swap in a labelled box naming the missing file.
+document.querySelectorAll('figure img').forEach(function (img) {
+  img.addEventListener('error', function () {
+    var box = document.createElement('div');
+    box.className = 'placeholder';
+    var name = img.getAttribute('src').split('/').pop();
+    box.innerHTML = '<span class="ph-name">' + name + '</span>' +
+                    '<span class="ph-alt">' + (img.getAttribute('alt') || '') + '</span>';
+    img.replaceWith(box);
+  });
+});
+</script>
+
+</body>
+</html>

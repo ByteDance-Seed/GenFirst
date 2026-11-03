@@ -1,0 +1,12 @@
+[
+  {
+    "dataset_name": "highres_source_1",
+    "data_path": "/path/to/highres_parquet_shards/*.parquet",
+    "weight": 1.0
+  },
+  {
+    "dataset_name": "ocr_source_1",
+    "data_path": "/path/to/ocr_parquet_shards/*.parquet",
+    "weight": 1.0
+  }
+]

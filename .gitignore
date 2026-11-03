@@ -1,0 +1,69 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+
+# Tooling
+.ipynb_checkpoints/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Datasets and preprocessed caches. Large, regenerable, and per-machine.
+# Written without a trailing slash so they also match the symlinks these
+# usually are; a directory pattern does not match a symlink.
+data
+data*/
+val_data
+*.h5
+*.hdf5
+
+# Model weights: initial VAEs, alignment encoders, extracted VAEs.
+pretrained
+ckpts
+extracted_vae
+*.pt
+*.pth
+*.safetensors
+
+# Training and sampling outputs
+exps
+logs/
+wandb/
+samples/
+*.npz
+# ...except the FID reference statistics, which ship with the repo.
+!fid_stats/*.npz
+
+# Evaluation assets downloaded on first use (reference batches, evaluator)
+eval_assets/
+
+# T2I benchmarks: upstream repos cloned and weights downloaded by
+# eval_bench/setup_eval_env.sh, plus generated images and scores. No trailing
+# slash -- these are often local symlinks to a shared cache, and a directory
+# pattern would not match those.
+eval_bench/geneval
+eval_bench/ELLA
+eval_bench/detector
+eval_bench/outputs/
+
+# Figures are committed; nothing here is ignored under assets/ except scratch
+assets/*.tmp
+
+# Project page: the assets link/copy is created locally, not committed
+project_page/assets
+
+# full-resolution figure originals kept locally, not shipped
+assets/*.orig.*

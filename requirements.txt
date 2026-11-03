@@ -1,0 +1,64 @@
+# pip-only alternative to environment.yml, for an existing Python 3.10 env.
+#
+# Install torch FIRST, matched to your CUDA runtime, because the pins below
+# assume it is already present. These results used torch 2.3.1 / CUDA 12.1:
+#
+#   pip install torch==2.3.1 torchvision==0.18.1 \
+#       --index-url https://download.pytorch.org/whl/cu121
+#   pip install -r requirements.txt
+#
+# The text-to-image benchmarks have their own heavy dependencies (see docs/T2I.md)
+# and are intentionally not listed here.
+#
+# Several packages are pinned ABOVE the versions the published results were
+# produced with, because the original pins carry known CVEs: click, diffusers,
+# pillow, pyarrow, requests and transformers. None of the upgrades touch an API
+# this repository uses -- the CLIP and T5 text encoders were checked to produce
+# bit-identical outputs before and after. environment.yml keeps the exact
+# original set for anyone reproducing bit-for-bit; see docs/SECURITY_NOTES.md.
+#
+# transformers 5.9.0 pulls huggingface-hub, tokenizers, regex and safetensors up
+# with it; those four are pinned to match and are not independent choices.
+
+accelerate==1.1.1
+antlr4-python3-runtime==4.9.3
+click==8.3.3
+dictdot==1.5.1
+diffusers==0.38.0
+einops==0.8.0
+ftfy==6.3.1
+h5py==3.12.1
+huggingface-hub==1.5.0
+numpy==1.26.4
+omegaconf==2.3.0
+pillow==12.3.0
+pyarrow==23.0.1
+pyspng==0.1.1
+pyyaml==6.0.2
+regex==2025.10.22
+requests==2.33.0
+safetensors==0.8.0
+timm==1.0.11
+tokenizers==0.22.1
+torchmetrics==1.4.3
+tqdm==4.67.1
+transformers==5.9.0
+wandb==0.18.7
+
+# CLIP is only needed for --enc-type clip; DINOv2 is the default and does not
+# require it.
+git+https://github.com/openai/CLIP.git
+
+# FID / IS for generated samples. This fork adds `fid_statistics_file`, which lets
+# us score against the precomputed reference statistics in fid_stats/ instead of
+# holding a 50k reference set in memory. The upstream torch-fidelity release does
+# NOT have that argument, so the fork is required, not a preference.
+git+https://github.com/LTH14/torch-fidelity.git@master#egg=torch-fidelity
+
+# LPIPS for the VAE reconstruction metrics (eval_recon.py).
+lpips==0.1.4
+
+# The Qwen3-VL paths of the understanding stage (`--vae qwenvit`, `--und-type nll`,
+# see docs/UND.md) need transformers >= 4.57. The pin above satisfies that, so no
+# separate environment is required; earlier revisions of this file pinned 4.46.3
+# and documented that upgrade as an opt-in step.

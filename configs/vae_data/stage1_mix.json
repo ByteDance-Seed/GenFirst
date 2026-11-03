@@ -1,0 +1,7 @@
+[
+  {
+    "dataset_name": "pretrain_source_1",
+    "data_path": "/path/to/stage1_parquet_shards/*.parquet",
+    "weight": 1.0
+  }
+]

@@ -1,0 +1,33 @@
+model:
+    vq_model:
+        quantize_mode: vae
+
+losses:
+    # For the frozen-encoder warm-up of the Qwen3-VL AE (--vae qwenvit, stage 0 in
+    # docs/UND.md): train a from-scratch decoder against a clean latent. Two
+    # differences from l1_lpips_entropy_gan.yaml:
+    #
+    # `latent_reg: kl` with a negligible weight, instead of entropy maximization.
+    # Entropy reg is the anti-collapse term for the case where the denoising
+    # gradient reaches the encoder; this stage has no denoising loss, so it has
+    # nothing to push back against and inflates the posterior variance instead
+    # (measured: 0.0025 -> 2.29, leaving most of the latent's variance as sampling
+    # noise). A weak KL keeps the mean bounded and lets reconstruction decide the
+    # variance.
+    #
+    # `discriminator_start: 10000` rather than 0: reconstruction saturates around
+    # 20k steps here, so a GAN term arriving later than that would land after the
+    # useful part of the stage was over, while starting it at 0 puts an adversarial
+    # gradient on a decoder that cannot yet reconstruct anything.
+    latent_reg: kl
+    kl_weight: 1.0e-6
+    discriminator_start: 10000
+    discriminator_factor: 1.0
+    discriminator_weight: 0.1
+    quantizer_weight: 1.0
+    perceptual_loss: "lpips"
+    perceptual_weight: 1.0
+    reconstruction_loss: "l1"
+    reconstruction_weight: 1.0
+    lecam_regularization_weight: 0.0
+    logvar_init: 0.0
