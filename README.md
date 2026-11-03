@@ -296,7 +296,7 @@ RESUME_STEP=1500000 bash scripts/run_prior_only_pipeline.sh train
 
 #### One extra step worth taking
 
-A 10k-step decoder-only finetune gives noticeably better results -- about 0.2 unguided gFID on ImageNet-256.
+A 10k-step decoder-only finetune gives noticeably better results.
 
 ```
 INIT_CKPT=exps/e2e-f8d4-sitxl2-256-phase2/checkpoints/0600000.pt \
